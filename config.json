@@ -1,0 +1,8 @@
+{
+    "OCPP_Server_Host" : "temsatech.temsa.com",
+    "OCPP_Server_Port" : 8010,
+    "OCPP_Server_Path" : "/OCPP16/65058ed6e5e95e69cbb9ea48/650adc90d74e8a522cc5c14c/",
+    "CP_ID"            : "T113_test",
+    "ChargePointVendor": "VOLTPO-TEMSATECH",
+    "ChargePointModel" : "VOLTPO30"
+}
