@@ -26,8 +26,7 @@ You will need:
 #### Building The Project
 
 ```bash
-$ git clone \
-    https://github.com/fevz10/ocpp_client.git
+$ git clone https://github.com/fevz10/ocpp_client.git
 $ cd ocpp_client
 $ mkdir build && cd build
 $ cmake ..
