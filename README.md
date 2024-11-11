@@ -38,3 +38,10 @@ $ make install
 $ ocpp_client
 ```
 
+### TODO
+
+- [ ] Adding multiple plugs
+- [ ] Reservation Operation
+- [ ] Update Firmware Operation
+- [ ] Diagnostic Operation
+- [ ] OCPP 2.0.1 Integration
