@@ -3,7 +3,7 @@
 while [ 1 ]
 do
         # Define the process name
-        process_name="/root/ocpp_client_cs2"
+        process_name="/root/ocpp_client_cs"
 
         # Check if the process is running
         if ps aux | grep -v grep | grep "$process_name" > /dev/null; then

@@ -2,13 +2,16 @@
 #include <string.h>
 #include <libwebsockets.h>
 #include <time.h>
-#include "cJSON.h"
+
 #include <pthread.h>
+
 #include <net/if.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <linux/can.h>
 #include <linux/can/raw.h>
+
+
 #include <unistd.h>
 #include <stdbool.h>
 #include <sys/stat.h>
@@ -17,12 +20,13 @@
 #include <stdlib.h>
 #include <termios.h>
 
+#include "cJSON.h"
 
 #define KGRN  "\x1B[32m"
 #define KRED  "\x1B[31m"
 #define FULLCHAIN_PEM_FILE "ca_certificate.crt"
 #define CACERT_FILE "cacert.pem"
-// console inputs definitions
+
 bool input_heartbeat = false;
 bool finishedTransactionChecker = false;
 int errCodeReason;
@@ -96,6 +100,34 @@ int uart_fd, uart_len;
 char uart_data[32];
 struct termios uart_options;
 
+void getTimestamp(void)
+{
+    time_t currentTime;
+    struct tm *timeInfo;
+
+    time(&currentTime);
+    timeInfo = gmtime(&currentTime);
+    //timeInfo->tm_hour -= 3;
+    // Format the timestamp
+    strftime(timestampBuffer, sizeof(timestampBuffer), "%Y-%m-%dT%H:%M:%S.000Z", timeInfo);
+
+    // Print the formatted timestamp
+    //printf("Formatted Timestamp: %s\n", timestampBuffer);
+}
+
+int sendOCPPFrame(int operation,const char *action, cJSON* jsonData)
+{
+    snprintf(txBuffer, sizeof(txBuffer), "[%d,\"d9d6618e-d015-4e3d-ae4c-a6f0840b71fa\",\"%s\",%s]", operation, action, cJSON_Print(jsonData));
+    return lws_write(wsi, (unsigned char *)txBuffer, strlen(txBuffer), LWS_WRITE_TEXT);
+    //memset(txBuffer, 0x00, 1000 * sizeof(char));
+}
+
+int sendOCPPRemoteFrame(int operation, char* uuid, cJSON* jsonData)
+{
+    snprintf(txBuffer, sizeof(txBuffer), "[%d,\"%s\",%s]", operation, uuid, cJSON_Print(jsonData));
+    return lws_write(wsi, (unsigned char *)txBuffer, strlen(txBuffer), LWS_WRITE_TEXT);
+    //memset(txBuffer, 0x00, 1000 * sizeof(char));
+}
 
 void UART_Init(void)
 {
@@ -103,7 +135,7 @@ void UART_Init(void)
     if ( uart_fd < 0 )
     {
         perror("Error opening serial port");
-        return -1;
+        return;
     }
     uart_options.c_cflag = B115200 | CS8 | CLOCAL | CREAD;
     uart_options.c_iflag = IGNPAR;
@@ -113,87 +145,6 @@ void UART_Init(void)
     tcflush(uart_fd, TCIFLUSH);
     tcsetattr(uart_fd, TCSANOW, &uart_options);
 }
-
-//uint8_t isNormalProcess = 0;
-
-/*
-int uart_fd;
-struct termios uart_config;
-char start_data[7] = "Start\n";
-char stop_data[6] = "Stop\n";
-int bytes_written;
-char *portname = "/dev/ttyS2";
-
-void UART_Init(void)
-{
-    uart_fd = open (portname, O_RDWR | O_NOCTTY | O_SYNC);
-    if (uart_fd < 0)
-    {
-        printf("error %d opening %s: %s", errno, portname, strerror(errno));
-        return;
-    }
-
-    set_interface_attribs (uart_fd, B9600, 0);  // set speed to 9,600 bps, 8n1 (no parity)
-    set_blocking (uart_fd, 0);                // set no blocking
-}
-
-int set_interface_attribs (int fd, int speed, int parity)
-{
-    struct termios tty;
-    if (tcgetattr (fd, &tty) != 0)
-    {
-        printf("error %d from tcgetattr", errno);
-        return -1;
-    }
-
-    cfsetospeed (&tty, speed);
-    cfsetispeed (&tty, speed);
-
-    tty.c_cflag = (tty.c_cflag & ~CSIZE) | CS8;     // 8-bit chars
-    // disable IGNBRK for mismatched speed tests; otherwise receive break
-    // as \000 chars
-    tty.c_iflag &= ~IGNBRK;         // disable break processing
-    tty.c_lflag = 0;                // no signaling chars, no echo,
-                                    // no canonical processing
-    tty.c_oflag = 0;                // no remapping, no delays
-    tty.c_cc[VMIN]  = 0;            // read doesn't block
-    tty.c_cc[VTIME] = 5;            // 0.5 seconds read timeout
-
-    tty.c_iflag &= ~(IXON | IXOFF | IXANY); // shut off xon/xoff ctrl
-
-    tty.c_cflag |= (CLOCAL | CREAD);// ignore modem controls,
-                                    // enable reading
-    tty.c_cflag &= ~(PARENB | PARODD);      // shut off parity
-    tty.c_cflag |= parity;
-    tty.c_cflag &= ~CSTOPB;
-
-    if (tcsetattr (fd, TCSANOW, &tty) != 0)
-    {
-            printf("error %d from tcsetattr", errno);
-            return -1;
-    }
-    return 0;
-}
-
-void set_blocking (int fd, int should_block)
-{
-    struct termios tty;
-    memset (&tty, 0, sizeof tty);
-    if (tcgetattr (fd, &tty) != 0)
-    {
-            printf("error %d from tggetattr", errno);
-            return;
-    }
-
-    tty.c_cc[VMIN]  = should_block ? 1 : 0;
-    tty.c_cc[VTIME] = 5;            // 0.5 seconds read timeout
-
-    if (tcsetattr (fd, TCSANOW, &tty) != 0)
-    {
-        printf("error %d setting term attributes", errno);
-    }
-}
-*/
 
 
 int isRemoteMsg(char *receivedStr)
@@ -381,34 +332,9 @@ static struct lws_protocols protocols[] =
     { NULL, NULL, 0, 0 } /* terminator */
 };
 
-int sendOCPPFrame(int operation,const char *action, cJSON* jsonData)
-{
-    snprintf(txBuffer, sizeof(txBuffer), "[%d,\"d9d6618e-d015-4e3d-ae4c-a6f0840b71fa\",\"%s\",%s]", operation, action, cJSON_Print(jsonData));
-    return lws_write(wsi, (unsigned char *)txBuffer, strlen(txBuffer), LWS_WRITE_TEXT);
-    //memset(txBuffer, 0x00, 1000 * sizeof(char));
-}
 
-int sendOCPPRemoteFrame(int operation, char* uuid, cJSON* jsonData)
-{
-    snprintf(txBuffer, sizeof(txBuffer), "[%d,\"%s\",%s]", operation, uuid, cJSON_Print(jsonData));
-    return lws_write(wsi, (unsigned char *)txBuffer, strlen(txBuffer), LWS_WRITE_TEXT);
-    //memset(txBuffer, 0x00, 1000 * sizeof(char));
-}
 
-void getTimestamp(void)
-{
-    time_t currentTime;
-    struct tm *timeInfo;
 
-    time(&currentTime);
-    timeInfo = gmtime(&currentTime);
-    //timeInfo->tm_hour -= 3;
-    // Format the timestamp
-    strftime(timestampBuffer, sizeof(timestampBuffer), "%Y-%m-%dT%H:%M:%S.000Z", timeInfo);
-
-    // Print the formatted timestamp
-    //printf("Formatted Timestamp: %s\n", timestampBuffer);
-}
 
 char* extractJsonData(const char* input)
 {
