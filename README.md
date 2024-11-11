@@ -1,2 +1,2 @@
 # ocpp_client
-OCPP Client Software using Libwebsockets (LWS) and cJSON
+OCPP1.6j Client Software using Libwebsockets (LWS) and cJSON
