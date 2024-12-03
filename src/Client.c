@@ -14,21 +14,8 @@ uint8_t EVSE_Session = 0;
 int ocppStateMachineState = 0;
 volatile bool stop_meter_thread = false;
 
-//extern uint8_t EVSE_CPstate;
-//extern uint8_t EVSE_ChargeState;
-//extern uint8_t EVSE_Session;
-//extern double EVDeliveredEnergy;
 
-
-//extern double EVPower;
-//extern double EVSOC;
-
-//extern pthread_t ocpp_process_pth;
-//extern void* ocpp_stateMachine(void * param);
-
-//extern volatile bool stop_meter_thread;
-
-int callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len)
+int32_t callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len)
 {        
     char received_frame_buffer[2048];
     errCodeReason = reason;
@@ -118,7 +105,7 @@ int callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, void
     return 0;
 }
 
-int Client_Initialize(void)
+int8_t Client_Initialize(void)
 {
     struct lws_protocols protocols[] = 
     {
@@ -345,7 +332,7 @@ double mapValue(double value, double inMin, double inMax, double outMin, double 
     return mappedValue;
 }
 
-int GetTransactionID(const char * jsonStr)
+int64_t GetTransactionID(const char * jsonStr)
 {
     cJSON *receiveBufferJSON;
     cJSON *transactionIDJSON;
@@ -355,7 +342,7 @@ int GetTransactionID(const char * jsonStr)
     transactionIDJSON = cJSON_GetObjectItemCaseSensitive(receiveBufferJSON, "transactionId"); 
     if (cJSON_IsNumber(transactionIDJSON) && (transactionIDJSON->valuestring != NULL))
     { 
-        return transactionIDJSON->valueint;
+        return (int64_t)transactionIDJSON->valueint;
     }
     else
     {
@@ -363,9 +350,9 @@ int GetTransactionID(const char * jsonStr)
     }
 }
 
-int sendOCPPFrame(int operation,const char *action, cJSON* jsonData)
+int32_t sendOCPPFrame(int operation,const char *action, cJSON* jsonData)
 {
-    int ret;
+    int32_t ret;
     snprintf(txBuffer, sizeof(txBuffer), "[%d,\"d9d6618e-d015-4e3d-ae4c-a6f0840b71fa\",\"%s\",%s]", operation, action, cJSON_Print(jsonData));
     ret = lws_write(wsi, (unsigned char *)txBuffer, strlen(txBuffer), LWS_WRITE_TEXT);
     memset(txBuffer, 0x00, 1000 * sizeof(char));
@@ -373,9 +360,9 @@ int sendOCPPFrame(int operation,const char *action, cJSON* jsonData)
     return ret;
 }
 
-int sendOCPPRemoteFrame(int operation, char* uuid, cJSON* jsonData)
+int32_t sendOCPPRemoteFrame(int operation, char* uuid, cJSON* jsonData)
 {
-    int ret;
+    int32_t ret;
     snprintf(txBuffer, sizeof(txBuffer), "[%d,\"%s\",%s]", operation, uuid, cJSON_Print(jsonData));
     ret = lws_write(wsi, (unsigned char *)txBuffer, strlen(txBuffer), LWS_WRITE_TEXT);
     memset(txBuffer, 0x00, 1000 * sizeof(char));
@@ -383,7 +370,7 @@ int sendOCPPRemoteFrame(int operation, char* uuid, cJSON* jsonData)
     return ret;
 }
 
-void sendOCPPMeterValues(double voltage, double current, double power, double energy, int SoC, int transaction_id, const char *timestamp)
+void sendOCPPMeterValues(double voltage, double current, double power, double energy, int SoC, int64_t transaction_id, const char *timestamp)
 {
     cJSON *meterValuesRootJson = NULL;
     cJSON *meterValuesJSON = NULL;
@@ -459,7 +446,7 @@ void sendOCPPMeterValues(double voltage, double current, double power, double en
     char *jsonString = cJSON_Print(meterValuesRootJson);
 
     sendOCPPFrame(2, "MeterValues", meterValuesRootJson);
-    printf(INFO"[CLIENT] Sent Meter Values. Voltage: %s, Current: %s, Power: %s, Energy: %s, SoC: %s, Transaction ID: %d, Timestamp: %s\n"RST,strVoltage, strCurrent, strPower, strEnergy, strSOC, transaction_id, timestamp);
+    printf(INFO"[CLIENT] Sent Meter Values. Voltage: %s, Current: %s, Power: %s, Energy: %s, SoC: %s, Transaction ID: %jd, Timestamp: %s\n"RST,strVoltage, strCurrent, strPower, strEnergy, strSOC, transaction_id, timestamp);
     
     /*
     cJSON_Delete(sampledValueVoltageObj);
@@ -523,7 +510,7 @@ void sendOCPPBootNotification(const char *ChargePointModel, const char *ChargePo
     cJSON_Delete(bootNotificationJSON);
 }
 
-void sendOCPPStartTransaction(uint8_t ConnectorID, const char * IDTag, int meterStart, const char * timestamp)
+void sendOCPPStartTransaction(uint8_t ConnectorID, const char * IDTag, double meterStart, const char * timestamp)
 {
     cJSON *startTransactionJSON = NULL;
 
@@ -539,7 +526,7 @@ void sendOCPPStartTransaction(uint8_t ConnectorID, const char * IDTag, int meter
     cJSON_Delete(startTransactionJSON);
 }
 
-void sendOCPPStopTransaction(uint8_t ConnectorID, int TransactionID, double meterStop, const char * timestamp)
+void sendOCPPStopTransaction(uint8_t ConnectorID, int64_t TransactionID, double meterStop, const char * timestamp)
 {
     cJSON *stopTransactionJSON = NULL;
 
@@ -631,7 +618,7 @@ void* ocpp_stateMachine(void * param)
                     FILE *fp = fopen("/root/transaction_id.txt", "r");
                     if (fp != NULL)
                     {
-                        fscanf(fp, "%d", &transaction_id);
+                        fscanf(fp, "%jd", &transaction_id);
                         fclose(fp);
                     }                    
                     getTimestamp();
@@ -667,7 +654,7 @@ void* ocpp_stateMachine(void * param)
                     FILE *fp2 = fopen("/root/transaction_id.txt", "r");
                     if (fp2 != NULL)
                     {
-                        fscanf(fp2, "%d", &transaction_id);
+                        fscanf(fp2, "%jd", &transaction_id);
                         fclose(fp2);
                     }
                 }
@@ -681,7 +668,7 @@ void* ocpp_stateMachine(void * param)
                     FILE *fp1 = fopen("/root/transaction_id.txt", "w");
                     if (fp1 != NULL)
                     {
-                        fprintf(fp1, "%d", 0);
+                        fprintf(fp1, "%jd", 0);
                         fclose(fp1);
                     }
                     finishedTransactionChecker = true;
@@ -761,7 +748,7 @@ void* ocpp_stateMachine(void * param)
                         FILE *fp1 = fopen("/root/transaction_id.txt", "w");
                         if (fp1 != NULL)
                         {
-                            fprintf(fp1, "%d", transaction_id);
+                            fprintf(fp1, "%jd", transaction_id);
                             fclose(fp1);
                         }
                     }
@@ -779,7 +766,7 @@ void* ocpp_stateMachine(void * param)
                     FILE *fp = fopen("/root/transaction_id.txt", "r");
                     if (fp != NULL)
                     {
-                        fscanf(fp, "%d", &transaction_id);
+                        fscanf(fp, "%jd", &transaction_id);
                         fclose(fp);
                     }
                     getTimestamp();

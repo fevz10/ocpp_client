@@ -1,9 +1,11 @@
-project(ocpp_client C)
+project(ocpp_client LANGUAGES C)
 cmake_minimum_required(VERSION 3.5)
 
 find_package(libwebsockets CONFIG REQUIRED)
-set(SRCS main.c cJSON.c CAN.c Client.c Config.c)
 
-add_executable(${PROJECT_NAME} ${SRCS})
+include_directories(${CMAKE_SOURCE_DIR}/include)
+file(GLOB SOURCES "src/*.c" main.c)
+
+add_executable(${PROJECT_NAME} ${SOURCES})
 
 target_link_libraries(${PROJECT_NAME} PRIVATE websockets)

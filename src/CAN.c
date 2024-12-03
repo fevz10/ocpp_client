@@ -46,8 +46,8 @@ void* CAN_RX_THREAD(void * param)
             EVPresentVoltage = mapValue(EVPresentVoltage, 0, 4095, 0, 400);
             EVPresentCurrent = 100.6;
             EVPower = EVPresentVoltage * EVPresentCurrent;
-            EVSE_ChargeState = RXmsg.data[4] & 0x01;
-            EVSE_CPstate = RXmsg.data[5] & 0x01;
+            EVSE_ChargeState = RXmsg.data[4] & 0x01u;
+            EVSE_CPstate = RXmsg.data[5] & 0x01u;
             EVDeliveredEnergy = 1.5;
             EVSE_Session = 0;
             break;

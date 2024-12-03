@@ -34,31 +34,31 @@ double EVPresentCurrent;
 double EVSOC;
 double EVDeliveredEnergy;
 double EVPower;
-int transaction_id;
+int64_t transaction_id;
 char UUID[37];
 
 
-int callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len);
+int32_t callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len);
 
 void* ocpp_stateMachine(void * param);
 void* meterValues_thread(void * param);
 void* heartbeat_thread(void * param);
 void getTimestamp(void);
 
-int sendOCPPFrame(int operation,const char *action, cJSON* jsonData);
-int sendOCPPRemoteFrame(int operation, char* uuid, cJSON* jsonData);
+int32_t sendOCPPFrame(int operation,const char *action, cJSON* jsonData);
+int32_t sendOCPPRemoteFrame(int operation, char* uuid, cJSON* jsonData);
 
-int Client_Initialize(void);
+int8_t Client_Initialize(void);
 void Client_IsAwake(void);
 void Client_Reconnect(void);
 void Client_Destroy(void);
 
-void sendOCPPMeterValues(double voltage, double current, double power, double energy, int SoC, int transaction_id, const char *timestamp);
+void sendOCPPMeterValues(double voltage, double current, double power, double energy, int SoC, int64_t TransactionID, const char *timestamp);
 void sendOCPPHeartBeat(void);
 void sendOCPPStatusNotification(uint8_t ConnectorID, const char * CPStatus, uint8_t EVSESession);
 void sendOCPPBootNotification(const char *ChargePointModel, const char *ChargePointVendor);
-void sendOCPPStartTransaction(uint8_t ConnectorID, const char * IDTag, int meterStart, const char * timestamp);
-void sendOCPPStopTransaction(uint8_t ConnectorID, int TransactionID, double meterStop, const char * timestamp);
+void sendOCPPStartTransaction(uint8_t ConnectorID, const char * IDTag, double meterStart, const char * timestamp);
+void sendOCPPStopTransaction(uint8_t ConnectorID, int64_t TransactionID, double meterStop, const char * timestamp);
 void sendOCPPRemoteStartTransaction(const char * CPStatus);
 void sendOCPPRemoteStopTransaction(const char * CPStatus);
 
@@ -67,7 +67,7 @@ const char* getDetailedErrorCodeForSession(int code);
 const char* rawMessage2cJSON(const char* input);
 int isReceivedRemoteMessage(const char *receivedStr);
 int writeFIFO(const char * msg);
-int GetTransactionID(const char * jsonStr);
+int64_t GetTransactionID(const char * jsonStr);
 double mapValue(double value, double inMin, double inMax, double outMin, double outMax);
 
 #endif // CLIENT_H
