@@ -12,7 +12,7 @@ do
         else
                 echo "Process $process_name is not running. Starting it..."
                 # Run the process
-                /root/ocpp_client_cs2 &
+                $process_name &
                 echo "Process $process_name started."
         fi
 done
