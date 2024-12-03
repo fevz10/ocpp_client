@@ -1,3 +1,5 @@
 build/
 .vscode/
 .gitignore
+CompileAndBuild.sh
+ocpp_client

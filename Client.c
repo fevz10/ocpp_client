@@ -45,10 +45,10 @@ int callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, void
             //sscanf(in, "[%d,", &process_id);
             sscanf(in, "[%*d,\"%36[^\"]\",", UUID);
 
-            char* json_data_str = rawMessage2cJSON(in);
+            const char* json_data_str = rawMessage2cJSON( (const char *)in );
             //receiveBufferJSON = cJSON_Parse(json_data_str);
             transaction_id = GetTransactionID(json_data_str);
-            int isRemoteFrameFlag = isReceivedRemoteMessage(received_frame_buffer);
+            int isRemoteFrameFlag = isReceivedRemoteMessage((const char *)received_frame_buffer);
             memset(received_frame_buffer, 0x00, 2048 * sizeof(char));
             if(isRemoteFrameFlag != 0)
             {
@@ -213,7 +213,7 @@ void Client_Reconnect(void)
 
 }
 
-char* rawMessage2cJSON(const char* input)
+const char* rawMessage2cJSON(const char* input)
 {
     const char* start = strchr(input, '{');
     const char* end = strrchr(input, '}');
@@ -299,7 +299,7 @@ const char* getDetailedErrorCodeForSession(int code)
     }
 }
 
-int isReceivedRemoteMessage(char *receivedStr)
+int isReceivedRemoteMessage(const char * receivedStr)
 {
     if((strstr(receivedStr, (const char *)"RemoteStartTransaction") != NULL))
     {
@@ -345,7 +345,7 @@ double mapValue(double value, double inMin, double inMax, double outMin, double 
     return mappedValue;
 }
 
-int GetTransactionID(char * jsonStr)
+int GetTransactionID(const char * jsonStr)
 {
     cJSON *receiveBufferJSON;
     cJSON *transactionIDJSON;
@@ -383,7 +383,7 @@ int sendOCPPRemoteFrame(int operation, char* uuid, cJSON* jsonData)
     return ret;
 }
 
-void sendOCPPMeterValues(double voltage, double current, double power, double energy, int SoC, int transaction_id, char *timestamp)
+void sendOCPPMeterValues(double voltage, double current, double power, double energy, int SoC, int transaction_id, const char *timestamp)
 {
     cJSON *meterValuesRootJson = NULL;
     cJSON *meterValuesJSON = NULL;
@@ -493,7 +493,7 @@ void sendOCPPHeartBeat(void)
     cJSON_Delete(heartbeatJSON);
 }
 
-void sendOCPPStatusNotification(uint8_t ConnectorID, char * CPStatus, uint8_t EVSESession)
+void sendOCPPStatusNotification(uint8_t ConnectorID, const char * CPStatus, uint8_t EVSESession)
 {
     cJSON *statusNotificationJSON = NULL;
 
@@ -509,7 +509,7 @@ void sendOCPPStatusNotification(uint8_t ConnectorID, char * CPStatus, uint8_t EV
     cJSON_Delete(statusNotificationJSON);
 }
 
-void sendOCPPBootNotification(char *ChargePointModel, char *ChargePointVendor)
+void sendOCPPBootNotification(const char *ChargePointModel, const char *ChargePointVendor)
 {
     cJSON *bootNotificationJSON = NULL;
 
@@ -523,7 +523,7 @@ void sendOCPPBootNotification(char *ChargePointModel, char *ChargePointVendor)
     cJSON_Delete(bootNotificationJSON);
 }
 
-void sendOCPPStartTransaction(uint8_t ConnectorID, char * IDTag, int meterStart, char * timestamp)
+void sendOCPPStartTransaction(uint8_t ConnectorID, const char * IDTag, int meterStart, const char * timestamp)
 {
     cJSON *startTransactionJSON = NULL;
 
@@ -539,7 +539,7 @@ void sendOCPPStartTransaction(uint8_t ConnectorID, char * IDTag, int meterStart,
     cJSON_Delete(startTransactionJSON);
 }
 
-void sendOCPPStopTransaction(uint8_t ConnectorID, int TransactionID, double meterStop, char * timestamp)
+void sendOCPPStopTransaction(uint8_t ConnectorID, int TransactionID, double meterStop, const char * timestamp)
 {
     cJSON *stopTransactionJSON = NULL;
 
@@ -555,7 +555,7 @@ void sendOCPPStopTransaction(uint8_t ConnectorID, int TransactionID, double mete
     cJSON_Delete(stopTransactionJSON);
 }
 
-void sendOCPPRemoteStartTransaction(char * CPStatus)
+void sendOCPPRemoteStartTransaction(const char * CPStatus)
 {
     cJSON *remoteStartTransactionJSON = NULL;
 
@@ -568,7 +568,7 @@ void sendOCPPRemoteStartTransaction(char * CPStatus)
     cJSON_Delete(remoteStartTransactionJSON);
 }
 
-void sendOCPPRemoteStopTransaction(char * CPStatus)
+void sendOCPPRemoteStopTransaction(const char * CPStatus)
 {
     cJSON *remoteStopTransactionJSON = NULL;
 
@@ -592,7 +592,7 @@ void* meterValues_thread(void * param)
         }
         */
         getTimestamp();
-        sendOCPPMeterValues(EVPresentVoltage, EVPresentCurrent, EVPower, EVDeliveredEnergy, (int)EVSOC, transaction_id, timestampBuffer);
+        sendOCPPMeterValues(EVPresentVoltage, EVPresentCurrent, EVPower, EVDeliveredEnergy, (int)EVSOC, transaction_id, (const char *)timestampBuffer);
 
         if(meterValueOneMinCounter == 6)
         {
@@ -652,7 +652,7 @@ void* ocpp_stateMachine(void * param)
                 switch(EVSE_CPstate)
                 {
                     case 0:
-                        sendOCPPBootNotification(chargePointModel->valuestring, chargePointVendor->valuestring);
+                        sendOCPPBootNotification(chargePointModel->valuestring, chargePointVendor->valuestring); //*****//
                         sleep(1);
                         sendOCPPStatusNotification(1, "Available", EVSE_Session);
                         break;
@@ -675,7 +675,7 @@ void* ocpp_stateMachine(void * param)
                 if (transaction_id != 0 && EVSE_ChargeState != 1 && !finishedTransactionChecker)
                 {
                     getTimestamp();
-                    sendOCPPStopTransaction(1, transaction_id, EVDeliveredEnergy, timestampBuffer);
+                    sendOCPPStopTransaction(1, transaction_id, EVDeliveredEnergy, (const char *)timestampBuffer);
                     sleep(1);
 
                     FILE *fp1 = fopen("/root/transaction_id.txt", "w");
@@ -783,7 +783,7 @@ void* ocpp_stateMachine(void * param)
                         fclose(fp);
                     }
                     getTimestamp();
-                    sendOCPPStopTransaction(1, transaction_id, EVDeliveredEnergy, timestampBuffer);
+                    sendOCPPStopTransaction(1, transaction_id, EVDeliveredEnergy, (const char *)timestampBuffer);
                     sleep(1);
 
                     stop_meter_thread = true;

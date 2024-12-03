@@ -53,21 +53,21 @@ void Client_IsAwake(void);
 void Client_Reconnect(void);
 void Client_Destroy(void);
 
-void sendOCPPMeterValues(double voltage, double current, double power, double energy, int SoC, int transaction_id, char *timestamp);
+void sendOCPPMeterValues(double voltage, double current, double power, double energy, int SoC, int transaction_id, const char *timestamp);
 void sendOCPPHeartBeat(void);
-void sendOCPPStatusNotification(uint8_t ConnectorID, char * CPStatus, uint8_t EVSESession);
-void sendOCPPBootNotification(char *ChargePointModel, char *ChargePointVendor);
-void sendOCPPStartTransaction(uint8_t ConnectorID, char * IDTag, int meterStart, char * timestamp);
-void sendOCPPStopTransaction(uint8_t ConnectorID, int TransactionID, double meterStop, char * timestamp);
-void sendOCPPRemoteStartTransaction(char * CPStatus);
-void sendOCPPRemoteStopTransaction(char * CPStatus);
+void sendOCPPStatusNotification(uint8_t ConnectorID, const char * CPStatus, uint8_t EVSESession);
+void sendOCPPBootNotification(const char *ChargePointModel, const char *ChargePointVendor);
+void sendOCPPStartTransaction(uint8_t ConnectorID, const char * IDTag, int meterStart, const char * timestamp);
+void sendOCPPStopTransaction(uint8_t ConnectorID, int TransactionID, double meterStop, const char * timestamp);
+void sendOCPPRemoteStartTransaction(const char * CPStatus);
+void sendOCPPRemoteStopTransaction(const char * CPStatus);
 
 const char* getErrorCodeForSession(int code);
 const char* getDetailedErrorCodeForSession(int code);
-char* rawMessage2cJSON(const char* input);
-int isReceivedRemoteMessage(char *receivedStr);
+const char* rawMessage2cJSON(const char* input);
+int isReceivedRemoteMessage(const char *receivedStr);
 int writeFIFO(const char * msg);
-int GetTransactionID(char * jsonStr);
+int GetTransactionID(const char * jsonStr);
 double mapValue(double value, double inMin, double inMax, double outMin, double outMax);
 
 #endif // CLIENT_H
