@@ -23,7 +23,7 @@ void Config_Read(void)
         return; 
     }
     char buffer[2048]; 
-    int len = fread(buffer, 1, sizeof(buffer), fp); 
+    (int)fread(buffer, 1, sizeof(buffer), fp); 
     fclose(fp); 
   
     cJSON *json = cJSON_Parse(buffer);

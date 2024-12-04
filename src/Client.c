@@ -17,26 +17,27 @@ volatile bool stop_meter_thread = false;
 
 int32_t callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len)
 {        
+    (void *)user;   //  UNUSED
     char received_frame_buffer[2048];
     errCodeReason = reason;
     switch (reason) 
     {
         case LWS_CALLBACK_CLIENT_ESTABLISHED:
-            printf(INFO"[CLIENT] Connected to the OCPP Server\n"RST);
+            (int)printf(INFO"[CLIENT] Connected to the OCPP Server\n"RST);
             pthread_create(&ocpp_process_pth, NULL, ocpp_stateMachine, NULL);
-            printf(INFO"[CLIENT] Started OCPP Client State Machine.\n"RST);
+            (int)printf(INFO"[CLIENT] Started OCPP Client State Machine.\n"RST);
             break;
         case LWS_CALLBACK_CLIENT_RECEIVE:
-            printf(RX"[SERVER] Received data from server : %.*s\n"RST, (int)len, (char *)in);
-            sprintf(received_frame_buffer, "%.*s", (int)len, (char *)in);
+            (int)printf(RX"[SERVER] Received data from server : %.*s\n"RST, (int)len, (char *)in);
+            (int)sprintf(received_frame_buffer, "%.*s", (int)len, (char *)in);
             //sscanf(in, "[%d,", &process_id);
-            sscanf(in, "[%*d,\"%36[^\"]\",", UUID);
+            (int)sscanf(in, "[%*d,\"%36[^\"]\",", UUID);
 
             const char* json_data_str = rawMessage2cJSON( (const char *)in );
             //receiveBufferJSON = cJSON_Parse(json_data_str);
             transaction_id = GetTransactionID(json_data_str);
             int isRemoteFrameFlag = isReceivedRemoteMessage((const char *)received_frame_buffer);
-            memset(received_frame_buffer, 0x00, 2048 * sizeof(char));
+            (int)memset(received_frame_buffer, 0x00, 2048 * sizeof(char));
             if(isRemoteFrameFlag != 0)
             {
                 switch (isRemoteFrameFlag)
@@ -45,7 +46,7 @@ int32_t callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, 
                     // Remote Start 
                     if( (EVSE_CPstate==1) && (EVSE_ChargeState != 1) )
                     {
-                        writeFIFO((const char *)"RemoteStart");
+                        (int)writeFIFO((const char *)"RemoteStart");
                         sleep(1);
 
                         sendOCPPRemoteStartTransaction("Accepted");
@@ -63,7 +64,7 @@ int32_t callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, 
                     // Remote Stop
                     if( (EVSE_CPstate==1) && (EVSE_ChargeState == 1) )
                     {
-                        writeFIFO((const char *)"RemoteStop");
+                        (int)writeFIFO((const char *)"RemoteStop");
                         sleep(1);
 
                         sendOCPPRemoteStopTransaction("Accepted");
@@ -83,19 +84,19 @@ int32_t callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, 
             }
             break;
         case LWS_CALLBACK_CLOSED:
-            printf(ERR"LWS_CALLBACK_CLOSED\n"RST);
+            (int)printf(ERR"LWS_CALLBACK_CLOSED\n"RST);
             wsi = NULL;
             break;
         case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
-            printf(ERR"LWS_CALLBACK_CLIENT_CONNECTION_ERROR\n"RST);
+            (int)printf(ERR"LWS_CALLBACK_CLIENT_CONNECTION_ERROR\n"RST);
             wsi = NULL;
             break;
         case LWS_CALLBACK_CLIENT_CLOSED:
-            printf(ERR"LWS_CALLBACK_CLIENT_CLOSED\n"RST);
+            (int)printf(ERR"LWS_CALLBACK_CLIENT_CLOSED\n"RST);
             wsi = NULL;
             break;
         case LWS_CALLBACK_WSI_DESTROY:
-            printf(ERR"LWS_CALLBACK_WSI_DESTROY\n"RST);
+            (int)printf(ERR"LWS_CALLBACK_WSI_DESTROY\n"RST);
             lws_context_destroy(context);
             wsi = NULL;
             break;
@@ -117,7 +118,7 @@ int8_t Client_Initialize(void)
         },
         { NULL, NULL, 0, 0 }
     };
-    memset(&info, 0, sizeof(info));
+    (int)memset(&info, 0, sizeof(info));
 
     info.port = CONTEXT_PORT_NO_LISTEN;
     info.protocols = protocols;
@@ -128,7 +129,7 @@ int8_t Client_Initialize(void)
     context = lws_create_context(&info);
     if (!context) 
     {
-        fprintf(stderr, "libwebsocket init failed\n");
+        (int)fprintf(stderr, "libwebsocket init failed\n");
         return -1;
     }
     struct lws_client_connect_info ccinfo = {
@@ -146,9 +147,11 @@ int8_t Client_Initialize(void)
     
     if (!wsi) 
     {
-        fprintf(stderr, "libwebsocket connection failed\n");
-        printf("%s", (char *)wsi);
+        (int)fprintf(stderr, "libwebsocket connection failed\n");
+        (int)printf("%s", (char *)wsi);
+        return -1;
     }
+    return 1;
 }
 
 void Client_IsAwake(void)
@@ -178,7 +181,7 @@ void Client_Destroy(void)
 
 void Client_Reconnect(void)
 {
-    printf("Attempting to reconnect...\n");
+    (int)printf("Attempting to reconnect...\n");
     struct lws_client_connect_info ccinfo = {
         .context = context,
         .address = ocpp_server_host->valuestring,
@@ -194,7 +197,7 @@ void Client_Reconnect(void)
 
     if (!wsi)
     {
-        fprintf(stderr, "libwebsocket connection failed: %s\n", strerror(errno));
+        (int)fprintf(stderr, "libwebsocket connection failed: %s\n", strerror(errno));
         lws_context_destroy(context);
     }
 
@@ -209,7 +212,7 @@ const char* rawMessage2cJSON(const char* input)
     {
         size_t length = end - start + 1;
         char* json_data = (char*)malloc(length + 1);
-        strncpy(json_data, start, length);
+        (int)strncpy(json_data, start, length);
         json_data[length] = '\0';
         return json_data;
     }
@@ -311,7 +314,7 @@ int writeFIFO(const char * msg)
         return 0x00;
     }
     write(fd, msg, sizeof(msg) * (strlen(msg) + 1));
-    printf(INFO"[FIFO] Sent %s to HMI\n"RST, msg);
+    (int)printf(INFO"[FIFO] Sent %s to HMI\n"RST, msg);
     close(fd);
     return 0x01;
 }
@@ -323,7 +326,7 @@ void getTimestamp(void)
 
     time(&currentTime);
     timeInfo = gmtime(&currentTime);
-    strftime(timestampBuffer, sizeof(timestampBuffer), "%Y-%m-%dT%H:%M:%S.000Z", timeInfo);
+    (int)strftime(timestampBuffer, sizeof(timestampBuffer), "%Y-%m-%dT%H:%M:%S.000Z", timeInfo);
 }
 
 double mapValue(double value, double inMin, double inMax, double outMin, double outMax)
@@ -353,9 +356,9 @@ int64_t GetTransactionID(const char * jsonStr)
 int32_t sendOCPPFrame(int operation,const char *action, cJSON* jsonData)
 {
     int32_t ret;
-    snprintf(txBuffer, sizeof(txBuffer), "[%d,\"d9d6618e-d015-4e3d-ae4c-a6f0840b71fa\",\"%s\",%s]", operation, action, cJSON_Print(jsonData));
+    (int)snprintf(txBuffer, sizeof(txBuffer), "[%d,\"d9d6618e-d015-4e3d-ae4c-a6f0840b71fa\",\"%s\",%s]", operation, action, cJSON_Print(jsonData));
     ret = lws_write(wsi, (unsigned char *)txBuffer, strlen(txBuffer), LWS_WRITE_TEXT);
-    memset(txBuffer, 0x00, 1000 * sizeof(char));
+    (int)memset(txBuffer, 0x00, 1000 * sizeof(char));
 
     return ret;
 }
@@ -363,9 +366,9 @@ int32_t sendOCPPFrame(int operation,const char *action, cJSON* jsonData)
 int32_t sendOCPPRemoteFrame(int operation, char* uuid, cJSON* jsonData)
 {
     int32_t ret;
-    snprintf(txBuffer, sizeof(txBuffer), "[%d,\"%s\",%s]", operation, uuid, cJSON_Print(jsonData));
+    (int)snprintf(txBuffer, sizeof(txBuffer), "[%d,\"%s\",%s]", operation, uuid, cJSON_Print(jsonData));
     ret = lws_write(wsi, (unsigned char *)txBuffer, strlen(txBuffer), LWS_WRITE_TEXT);
-    memset(txBuffer, 0x00, 1000 * sizeof(char));
+    (int)memset(txBuffer, 0x00, 1000 * sizeof(char));
 
     return ret;
 }
@@ -395,7 +398,7 @@ void sendOCPPMeterValues(double voltage, double current, double power, double en
     cJSON_AddStringToObject(meterValuesJSON, "timestamp", timestamp);
     sampledValueArray = cJSON_AddArrayToObject(meterValuesJSON, "sampledValue");
     
-    sprintf(strVoltage, "%.2f", voltage);
+    (int)sprintf(strVoltage, "%.2f", voltage);
     sampledValueVoltageObj = cJSON_CreateObject();
     cJSON_AddStringToObject(sampledValueVoltageObj, "value", strVoltage);
     cJSON_AddStringToObject(sampledValueVoltageObj, "context", "Sample.Periodic");
@@ -405,7 +408,7 @@ void sendOCPPMeterValues(double voltage, double current, double power, double en
     cJSON_AddStringToObject(sampledValueVoltageObj, "unit", "V");
     cJSON_AddItemToArray(sampledValueArray, sampledValueVoltageObj);
     
-    sprintf(strCurrent, "%.2f", current);
+    (int)sprintf(strCurrent, "%.2f", current);
     sampledValueCurrentObj = cJSON_CreateObject();
     cJSON_AddStringToObject(sampledValueCurrentObj, "value", strCurrent);
     cJSON_AddStringToObject(sampledValueCurrentObj, "context", "Sample.Periodic");
@@ -415,7 +418,7 @@ void sendOCPPMeterValues(double voltage, double current, double power, double en
     cJSON_AddStringToObject(sampledValueCurrentObj, "unit", "A");
     cJSON_AddItemToArray(sampledValueArray, sampledValueCurrentObj);
 
-    sprintf(strPower, "%.2f ", power);
+    (int)sprintf(strPower, "%.2f ", power);
     sampledValuePowerObj = cJSON_CreateObject();
     cJSON_AddStringToObject(sampledValuePowerObj, "value", strPower);
     cJSON_AddStringToObject(sampledValuePowerObj, "context", "Sample.Periodic");
@@ -425,7 +428,7 @@ void sendOCPPMeterValues(double voltage, double current, double power, double en
     cJSON_AddStringToObject(sampledValuePowerObj, "unit", "W");
     cJSON_AddItemToArray(sampledValueArray, sampledValuePowerObj);
 
-    sprintf(strEnergy, "%lf", energy);
+    (int)sprintf(strEnergy, "%lf", energy);
     sampledValueEnergyObj = cJSON_CreateObject();
     cJSON_AddStringToObject(sampledValueEnergyObj, "value", strEnergy);
     cJSON_AddStringToObject(sampledValueEnergyObj, "context", "Sample.Periodic");
@@ -435,7 +438,7 @@ void sendOCPPMeterValues(double voltage, double current, double power, double en
     cJSON_AddStringToObject(sampledValueEnergyObj, "unit", "kWh");
     cJSON_AddItemToArray(sampledValueArray, sampledValueEnergyObj);
 
-    sprintf(strSOC, "%d", SoC);
+    (int)sprintf(strSOC, "%d", SoC);
     sampledValueSoCObj = cJSON_CreateObject();
     cJSON_AddStringToObject(sampledValueSoCObj, "value", strSOC);
     cJSON_AddStringToObject(sampledValueSoCObj, "unit", "Percent");
@@ -443,10 +446,10 @@ void sendOCPPMeterValues(double voltage, double current, double power, double en
     cJSON_AddItemToArray(sampledValueArray, sampledValueSoCObj);
     
     cJSON_AddItemToArray(meterValueArray, meterValuesJSON);
-    char *jsonString = cJSON_Print(meterValuesRootJson);
+    //char *jsonString = cJSON_Print(meterValuesRootJson);
 
-    sendOCPPFrame(2, "MeterValues", meterValuesRootJson);
-    printf(INFO"[CLIENT] Sent Meter Values. Voltage: %s, Current: %s, Power: %s, Energy: %s, SoC: %s, Transaction ID: %jd, Timestamp: %s\n"RST,strVoltage, strCurrent, strPower, strEnergy, strSOC, transaction_id, timestamp);
+    (int32_t)sendOCPPFrame(2, "MeterValues", meterValuesRootJson);
+    (int)printf(INFO"[CLIENT] Sent Meter Values. Voltage: %s, Current: %s, Power: %s, Energy: %s, SoC: %s, Transaction ID: %jd, Timestamp: %s\n"RST,strVoltage, strCurrent, strPower, strEnergy, strSOC, transaction_id, timestamp);
     
     /*
     cJSON_Delete(sampledValueVoltageObj);
@@ -460,11 +463,11 @@ void sendOCPPMeterValues(double voltage, double current, double power, double en
     */
     cJSON_Delete(meterValuesRootJson);
     
-    memset(strVoltage, 0x00, sizeof(strVoltage));
-    memset(strCurrent, 0x00, sizeof(strCurrent));
-    memset(strPower, 0x00, sizeof(strPower));
-    memset(strEnergy, 0x00, sizeof(strEnergy));
-    memset(strSOC, 0x00, sizeof(strSOC));
+    (int)memset(strVoltage, 0x00, sizeof(strVoltage));
+    (int)memset(strCurrent, 0x00, sizeof(strCurrent));
+    (int)memset(strPower, 0x00, sizeof(strPower));
+    (int)memset(strEnergy, 0x00, sizeof(strEnergy));
+    (int)memset(strSOC, 0x00, sizeof(strSOC));
 }
 
 void sendOCPPHeartBeat(void)
@@ -474,8 +477,8 @@ void sendOCPPHeartBeat(void)
     heartbeatJSON = cJSON_CreateObject();
     cJSON_AddStringToObject(heartbeatJSON, "", "");
 
-    sendOCPPFrame(2,"Heartbeat", heartbeatJSON);
-    printf(INFO"[CLIENT] Sent HeartBeat.\n"RST);
+    (int32_t)sendOCPPFrame(2,"Heartbeat", heartbeatJSON);
+    (int)printf(INFO"[CLIENT] Sent HeartBeat.\n"RST);
 
     cJSON_Delete(heartbeatJSON);
 }
@@ -490,8 +493,8 @@ void sendOCPPStatusNotification(uint8_t ConnectorID, const char * CPStatus, uint
     cJSON_AddStringToObject(statusNotificationJSON, "errorCode", getErrorCodeForSession(EVSESession));
     cJSON_AddStringToObject(statusNotificationJSON, "vendorErrorCode", getDetailedErrorCodeForSession(EVSESession));
 
-    sendOCPPFrame(2, "StatusNotification", statusNotificationJSON);
-    printf(INFO"[CLIENT] Sent Status Notification. Status : %s\n"RST, CPStatus);
+    (int32_t)sendOCPPFrame(2, "StatusNotification", statusNotificationJSON);
+    (int)printf(INFO"[CLIENT] Sent Status Notification. Status : %s\n"RST, CPStatus);
 
     cJSON_Delete(statusNotificationJSON);
 }
@@ -504,8 +507,8 @@ void sendOCPPBootNotification(const char *ChargePointModel, const char *ChargePo
     cJSON_AddStringToObject(bootNotificationJSON, "chargePointVendor", ChargePointVendor);
     cJSON_AddStringToObject(bootNotificationJSON, "chargePointModel", ChargePointModel);
 
-    sendOCPPFrame(2, "BootNotification", bootNotificationJSON);
-    printf(INFO"[CLIENT] Sent Boot Notification.\n"RST);
+    (int32_t)sendOCPPFrame(2, "BootNotification", bootNotificationJSON);
+    (int)printf(INFO"[CLIENT] Sent Boot Notification.\n"RST);
 
     cJSON_Delete(bootNotificationJSON);
 }
@@ -520,8 +523,8 @@ void sendOCPPStartTransaction(uint8_t ConnectorID, const char * IDTag, double me
     cJSON_AddNumberToObject(startTransactionJSON, "meterStart", meterStart);
     cJSON_AddStringToObject(startTransactionJSON, "timestamp", timestamp);
     
-    sendOCPPFrame(2, "StartTransaction", startTransactionJSON);
-    printf(INFO"[CLIENT] Sent Start Transaction.\n"RST);
+    (int32_t)sendOCPPFrame(2, "StartTransaction", startTransactionJSON);
+    (int)printf(INFO"[CLIENT] Sent Start Transaction.\n"RST);
     
     cJSON_Delete(startTransactionJSON);
 }
@@ -536,8 +539,8 @@ void sendOCPPStopTransaction(uint8_t ConnectorID, int64_t TransactionID, double 
     cJSON_AddStringToObject(stopTransactionJSON, "timestamp", timestamp);                    
     cJSON_AddNumberToObject(stopTransactionJSON, "transactionId", TransactionID);
 
-    sendOCPPFrame(2, "StopTransaction", stopTransactionJSON);
-    printf(INFO"[CLIENT] Sent Stop Transaction.\n"RST);
+    (int32_t)sendOCPPFrame(2, "StopTransaction", stopTransactionJSON);
+    (int)printf(INFO"[CLIENT] Sent Stop Transaction.\n"RST);
 
     cJSON_Delete(stopTransactionJSON);
 }
@@ -549,8 +552,8 @@ void sendOCPPRemoteStartTransaction(const char * CPStatus)
     remoteStartTransactionJSON = cJSON_CreateObject();
     cJSON_AddStringToObject(remoteStartTransactionJSON, "status", CPStatus);
 
-    sendOCPPRemoteFrame(3, UUID, remoteStartTransactionJSON);
-    printf(INFO"[CLIENT] Sent Remote Start Transaction. Status : %s\n"RST, CPStatus);
+    (int32_t)sendOCPPRemoteFrame(3, UUID, remoteStartTransactionJSON);
+    (int)printf(INFO"[CLIENT] Sent Remote Start Transaction. Status : %s\n"RST, CPStatus);
 
     cJSON_Delete(remoteStartTransactionJSON);
 }
@@ -562,24 +565,19 @@ void sendOCPPRemoteStopTransaction(const char * CPStatus)
     remoteStopTransactionJSON = cJSON_CreateObject();
     cJSON_AddStringToObject(remoteStopTransactionJSON, "status", CPStatus);
 
-    sendOCPPRemoteFrame(3, UUID, remoteStopTransactionJSON);
-    printf(INFO"[CLIENT] Sent Remote Stop Transaction. Status : %s\n"RST, CPStatus);
+    (int32_t)sendOCPPRemoteFrame(3, UUID, remoteStopTransactionJSON);
+    (int)printf(INFO"[CLIENT] Sent Remote Stop Transaction. Status : %s\n"RST, CPStatus);
 
     cJSON_Delete(remoteStopTransactionJSON);
 }
 
 void* meterValues_thread(void * param)
 {
+    (void *)param;  //  UNUSED
     while (!stop_meter_thread)
     {   
-        /*
-        if (EVSE_ChargeState != 1)
-        {
-            break;
-        }
-        */
-        getTimestamp();
-        sendOCPPMeterValues(EVPresentVoltage, EVPresentCurrent, EVPower, EVDeliveredEnergy, (int)EVSOC, transaction_id, (const char *)timestampBuffer);
+        (void)getTimestamp();
+        (void)sendOCPPMeterValues(EVPresentVoltage, EVPresentCurrent, EVPower, EVDeliveredEnergy, (int)EVSOC, transaction_id, (const char *)timestampBuffer);
 
         if(meterValueOneMinCounter == 6)
         {
@@ -596,6 +594,7 @@ void* meterValues_thread(void * param)
 
 void* heartbeat_thread(void * param)
 {  
+    (void *)param;  //  UNUSED
     while(1)
     {
         sendOCPPHeartBeat();
@@ -606,6 +605,7 @@ void* heartbeat_thread(void * param)
 
 void* ocpp_stateMachine(void * param)
 {
+    (void *)param;  //  UNUSED
     while(1)
     {
         switch(ocppStateMachineState)
@@ -618,8 +618,8 @@ void* ocpp_stateMachine(void * param)
                     FILE *fp = fopen("/root/transaction_id.txt", "r");
                     if (fp != NULL)
                     {
-                        fscanf(fp, "%jd", &transaction_id);
-                        fclose(fp);
+                        (int)fscanf(fp, "%jd", &transaction_id);
+                        (int)fclose(fp);
                     }                    
                     getTimestamp();
                     //printf("Transaction ID : %d", transaction_id);
@@ -654,8 +654,8 @@ void* ocpp_stateMachine(void * param)
                     FILE *fp2 = fopen("/root/transaction_id.txt", "r");
                     if (fp2 != NULL)
                     {
-                        fscanf(fp2, "%jd", &transaction_id);
-                        fclose(fp2);
+                        (int)fscanf(fp2, "%jd", &transaction_id);
+                        (int)fclose(fp2);
                     }
                 }
                 
@@ -668,8 +668,8 @@ void* ocpp_stateMachine(void * param)
                     FILE *fp1 = fopen("/root/transaction_id.txt", "w");
                     if (fp1 != NULL)
                     {
-                        fprintf(fp1, "%jd", 0);
-                        fclose(fp1);
+                        (int)fprintf(fp1, "%jd", (int64_t)0);
+                        (int)fclose(fp1);
                     }
                     finishedTransactionChecker = true;
                 }
@@ -729,15 +729,7 @@ void* ocpp_stateMachine(void * param)
                     }
 
                     sleep(1);
-                    sprintf(evccidStr, "%u", EVCCID);
-                    /*
-                    FILE *fp = fopen("/root/evccid.txt", "w");
-                    if (fp != NULL)
-                    {
-                        fprintf(fp, "%s", evccidStr);
-                        fclose(fp);
-                    }
-                    */
+                    (int)sprintf(evccidStr, "%u", EVCCID);
                     sleep(1);
                     getTimestamp();
                     sendOCPPStartTransaction(1, evccidStr, 0, timestampBuffer);
@@ -748,8 +740,8 @@ void* ocpp_stateMachine(void * param)
                         FILE *fp1 = fopen("/root/transaction_id.txt", "w");
                         if (fp1 != NULL)
                         {
-                            fprintf(fp1, "%jd", transaction_id);
-                            fclose(fp1);
+                            (int)fprintf(fp1, "%jd", transaction_id);
+                            (int)fclose(fp1);
                         }
                     }
                     sleep(1);
@@ -766,8 +758,8 @@ void* ocpp_stateMachine(void * param)
                     FILE *fp = fopen("/root/transaction_id.txt", "r");
                     if (fp != NULL)
                     {
-                        fscanf(fp, "%jd", &transaction_id);
-                        fclose(fp);
+                        (int)fscanf(fp, "%jd", &transaction_id);
+                        (int)fclose(fp);
                     }
                     getTimestamp();
                     sendOCPPStopTransaction(1, transaction_id, EVDeliveredEnergy, (const char *)timestampBuffer);

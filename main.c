@@ -2,9 +2,9 @@
 #include "CAN.h"
 #include "Config.h"
 
-int main(void)
+void main(void)
 {
-    Config_Read();
+    Config_Initialize();
     CAN_Initialize();
     Client_Initialize();
 
@@ -14,6 +14,6 @@ int main(void)
     }
 
     Client_Destroy();
-    
-    return 0;
+
+    //return 0;
 }
