@@ -10,7 +10,7 @@ uint8_t meterValueOneMinCounter = 0;
 bool finishedTransactionChecker = false;
 uint heartBeatInterval = 120;
 uint16_t EVCCID = 38;
-uint8_t EVSE_Session = 0;
+uint8_t EVSE_Session;// = 0;
 int ocppStateMachineState = 0;
 volatile bool stop_meter_thread = false;
 
@@ -305,6 +305,30 @@ int isReceivedRemoteMessage(const char * receivedStr)
     }
 }
 
+void generate_random_uuid(char *uuid_str) 
+{
+    unsigned char random_bytes[16];
+    
+    srand((unsigned int)time(NULL));
+
+    for (int i = 0; i < 16; i++) 
+    {
+        random_bytes[i] = rand() % 256; // Random byte
+    }
+
+    // Set the version to 4 (random UUID)
+    random_bytes[6] = (random_bytes[6] & 0x0f) | 0x40; // Version 4
+    // Set the variant to 10xx (RFC 4122)
+    random_bytes[8] = (random_bytes[8] & 0x3f) | 0x80; // Variant 1
+
+    snprintf(uuid_str, 37,
+             "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+             random_bytes[0], random_bytes[1], random_bytes[2], random_bytes[3],
+             random_bytes[4], random_bytes[5], random_bytes[6], random_bytes[7],
+             random_bytes[8], random_bytes[9], random_bytes[10], random_bytes[11],
+             random_bytes[12], random_bytes[13], random_bytes[14], random_bytes[15]);
+}
+
 int writeFIFO(const char * msg)
 {
     int fd = open("/tmp/myfifo", O_WRONLY);
@@ -335,7 +359,7 @@ double mapValue(double value, double inMin, double inMax, double outMin, double 
     return mappedValue;
 }
 
-int64_t GetTransactionID(const char * jsonStr)
+int GetTransactionID(const char * jsonStr)
 {
     cJSON *receiveBufferJSON;
     cJSON *transactionIDJSON;
@@ -356,7 +380,11 @@ int64_t GetTransactionID(const char * jsonStr)
 int32_t sendOCPPFrame(int operation,const char *action, cJSON* jsonData)
 {
     int32_t ret;
-    (int)snprintf(txBuffer, sizeof(txBuffer), "[%d,\"d9d6618e-d015-4e3d-ae4c-a6f0840b71fa\",\"%s\",%s]", operation, action, cJSON_Print(jsonData));
+    char uuid_str[37];
+    generate_random_uuid(uuid_str);
+
+    (int)snprintf(txBuffer, sizeof(txBuffer), "[%d,\"%s\",\"%s\",%s]", operation, uuid_str, action, cJSON_Print(jsonData));
+    (int)printf(TX"[CLIENT] Transmitted data to server : %s\n"RST, txBuffer);
     ret = lws_write(wsi, (unsigned char *)txBuffer, strlen(txBuffer), LWS_WRITE_TEXT);
     (int)memset(txBuffer, 0x00, 1000 * sizeof(char));
 
@@ -367,13 +395,14 @@ int32_t sendOCPPRemoteFrame(int operation, char* uuid, cJSON* jsonData)
 {
     int32_t ret;
     (int)snprintf(txBuffer, sizeof(txBuffer), "[%d,\"%s\",%s]", operation, uuid, cJSON_Print(jsonData));
+    (int)printf(TX"[CLIENT] Transmitted data to server : %s\n"RST, txBuffer);
     ret = lws_write(wsi, (unsigned char *)txBuffer, strlen(txBuffer), LWS_WRITE_TEXT);
     (int)memset(txBuffer, 0x00, 1000 * sizeof(char));
 
     return ret;
 }
 
-void sendOCPPMeterValues(double voltage, double current, double power, double energy, int SoC, int64_t transaction_id, const char *timestamp)
+void sendOCPPMeterValues(double voltage, double current, double power, double energy, uint8_t SoC, int TransactionID, const char *timestamp)
 {
     cJSON *meterValuesRootJson = NULL;
     cJSON *meterValuesJSON = NULL;
@@ -392,7 +421,7 @@ void sendOCPPMeterValues(double voltage, double current, double power, double en
 
     meterValuesRootJson = cJSON_CreateObject();
     cJSON_AddNumberToObject(meterValuesRootJson, "connectorId", 1);
-    cJSON_AddNumberToObject(meterValuesRootJson, "transactionId", transaction_id);
+    cJSON_AddNumberToObject(meterValuesRootJson, "transactionId", TransactionID);
     meterValueArray = cJSON_AddArrayToObject(meterValuesRootJson, "meterValue");
     meterValuesJSON = cJSON_CreateObject();
     cJSON_AddStringToObject(meterValuesJSON, "timestamp", timestamp);
@@ -438,7 +467,7 @@ void sendOCPPMeterValues(double voltage, double current, double power, double en
     cJSON_AddStringToObject(sampledValueEnergyObj, "unit", "kWh");
     cJSON_AddItemToArray(sampledValueArray, sampledValueEnergyObj);
 
-    (int)sprintf(strSOC, "%d", SoC);
+    (int)sprintf(strSOC, "%u", SoC);
     sampledValueSoCObj = cJSON_CreateObject();
     cJSON_AddStringToObject(sampledValueSoCObj, "value", strSOC);
     cJSON_AddStringToObject(sampledValueSoCObj, "unit", "Percent");
@@ -449,7 +478,7 @@ void sendOCPPMeterValues(double voltage, double current, double power, double en
     //char *jsonString = cJSON_Print(meterValuesRootJson);
 
     (int32_t)sendOCPPFrame(2, "MeterValues", meterValuesRootJson);
-    (int)printf(INFO"[CLIENT] Sent Meter Values. Voltage: %s, Current: %s, Power: %s, Energy: %s, SoC: %s, Transaction ID: %jd, Timestamp: %s\n"RST,strVoltage, strCurrent, strPower, strEnergy, strSOC, transaction_id, timestamp);
+    (int)printf(INFO"[CLIENT] Sent Meter Values. Voltage: %s, Current: %s, Power: %s, Energy: %s, SoC: %s, Transaction ID: %d, Timestamp: %s\n"RST,strVoltage, strCurrent, strPower, strEnergy, strSOC, TransactionID, timestamp);
     
     /*
     cJSON_Delete(sampledValueVoltageObj);
@@ -529,7 +558,7 @@ void sendOCPPStartTransaction(uint8_t ConnectorID, const char * IDTag, double me
     cJSON_Delete(startTransactionJSON);
 }
 
-void sendOCPPStopTransaction(uint8_t ConnectorID, int64_t TransactionID, double meterStop, const char * timestamp)
+void sendOCPPStopTransaction(uint8_t ConnectorID, int TransactionID, double meterStop, const char * timestamp)
 {
     cJSON *stopTransactionJSON = NULL;
 
@@ -577,7 +606,7 @@ void* meterValues_thread(void * param)
     while (!stop_meter_thread)
     {   
         (void)getTimestamp();
-        (void)sendOCPPMeterValues(EVPresentVoltage, EVPresentCurrent, EVPower, EVDeliveredEnergy, (int)EVSOC, transaction_id, (const char *)timestampBuffer);
+        (void)sendOCPPMeterValues(EVPresentVoltage, EVPresentCurrent, EVPower, EVDeliveredEnergy, EVSOC, transaction_id, (const char *)timestampBuffer);
 
         if(meterValueOneMinCounter == 6)
         {
@@ -611,14 +640,14 @@ void* ocpp_stateMachine(void * param)
         switch(ocppStateMachineState)
         {
             case 0: // Startup the station
-                if(EVSE_ChargeState == 1)
+                if(EVSE_ChargeState == 14)
                 {
                     sendOCPPStatusNotification(1, "Charging", EVSE_Session);
                     sleep(1);
                     FILE *fp = fopen("/root/transaction_id.txt", "r");
                     if (fp != NULL)
                     {
-                        (int)fscanf(fp, "%jd", &transaction_id);
+                        (int)fscanf(fp, "%d", &transaction_id);
                         (int)fclose(fp);
                     }                    
                     getTimestamp();
@@ -638,7 +667,7 @@ void* ocpp_stateMachine(void * param)
                 
                 switch(EVSE_CPstate)
                 {
-                    case 0:
+                    case 1:
                         sendOCPPBootNotification(chargePointModel->valuestring, chargePointVendor->valuestring); //*****//
                         sleep(1);
                         sendOCPPStatusNotification(1, "Available", EVSE_Session);
@@ -654,12 +683,12 @@ void* ocpp_stateMachine(void * param)
                     FILE *fp2 = fopen("/root/transaction_id.txt", "r");
                     if (fp2 != NULL)
                     {
-                        (int)fscanf(fp2, "%jd", &transaction_id);
+                        (int)fscanf(fp2, "%d", &transaction_id);
                         (int)fclose(fp2);
                     }
                 }
                 
-                if (transaction_id != 0 && EVSE_ChargeState != 1 && !finishedTransactionChecker)
+                if (transaction_id != 0 && EVSE_ChargeState != 14 && !finishedTransactionChecker)
                 {
                     getTimestamp();
                     sendOCPPStopTransaction(1, transaction_id, EVDeliveredEnergy, (const char *)timestampBuffer);
@@ -668,37 +697,39 @@ void* ocpp_stateMachine(void * param)
                     FILE *fp1 = fopen("/root/transaction_id.txt", "w");
                     if (fp1 != NULL)
                     {
-                        (int)fprintf(fp1, "%jd", (int64_t)0);
+                        (int)fprintf(fp1, "%d", (int64_t)0);
                         (int)fclose(fp1);
                     }
                     finishedTransactionChecker = true;
                 }
 
-                if( EVSE_CPstate == 0x01 )    //if plug is connected
+                if( (EVSE_CPstate==2) || (EVSE_CPstate==3) )    //if plug is connected
                 {
                     switch(EVSE_CPstate)
                     {
-                        case 0:
+                        case 1:
                             sendOCPPStatusNotification(1, "Available", EVSE_Session);
                             break;
-                        case 1:
-                            if (EVSE_ChargeState != 1)
+                        case 2:
+                            if (EVSE_ChargeState >= 6 && EVSE_ChargeState < 14)
                             {
                                 sendOCPPStatusNotification(1, "Preparing", EVSE_Session);
-                            }
-                            break;
-                        /*
-                        case 3:
-                            if (EVSE_ChargeState == 1)
-                            {
-                                sendOCPPStatusNotification(1, "Charging", EVSE_Session);
                             }
                             else
                             {
-                                sendOCPPStatusNotification(1, "Preparing", EVSE_Session);
+                                sendOCPPStatusNotification(1, "Finishing", EVSE_Session);
                             }
                             break;
-                        */
+                        case 3:
+                            if (EVSE_ChargeState >= 6 && EVSE_ChargeState < 14)
+                            {
+                                sendOCPPStatusNotification(1, "Preparing", EVSE_Session);
+                            }
+                            else
+                            {
+                                sendOCPPStatusNotification(1, "Finishing", EVSE_Session);
+                            }
+                            break;
                         default:
                             break;
                     }
@@ -707,15 +738,25 @@ void* ocpp_stateMachine(void * param)
                 }
                 break;
             case 2: // Charging State
-                if(EVSE_ChargeState == 1)  //Charging Startup
+                if(EVSE_ChargeState == 14)  //Charging Startup
                 {
                     switch(EVSE_CPstate)
                     {
-                        case 0:
+                        case 1:
                             sendOCPPStatusNotification(1, "Available", EVSE_Session);
                             break;
-                        case 1:
-                            if(EVSE_ChargeState == 1)
+                        case 2:
+                            if(EVSE_ChargeState == 14)
+                            {
+                                sendOCPPStatusNotification(1, "Charging", EVSE_Session);
+                            }
+                            else
+                            {
+                                sendOCPPStatusNotification(1, "Preparing", EVSE_Session);
+                            }
+                            break;
+                        case 3:
+                            if(EVSE_ChargeState == 14)
                             {
                                 sendOCPPStatusNotification(1, "Charging", EVSE_Session);
                             }
@@ -740,7 +781,7 @@ void* ocpp_stateMachine(void * param)
                         FILE *fp1 = fopen("/root/transaction_id.txt", "w");
                         if (fp1 != NULL)
                         {
-                            (int)fprintf(fp1, "%jd", transaction_id);
+                            (int)fprintf(fp1, "%d", transaction_id);
                             (int)fclose(fp1);
                         }
                     }
@@ -751,14 +792,14 @@ void* ocpp_stateMachine(void * param)
                 }
                 break;
             case 3: // Charging Finished State
-                if(EVSE_ChargeState != 1)
+                if(EVSE_ChargeState != 14)
                 {
                     sendOCPPStatusNotification(1, "Finishing", EVSE_Session);
                     sleep(1);
                     FILE *fp = fopen("/root/transaction_id.txt", "r");
                     if (fp != NULL)
                     {
-                        (int)fscanf(fp, "%jd", &transaction_id);
+                        (int)fscanf(fp, "%d", &transaction_id);
                         (int)fclose(fp);
                     }
                     getTimestamp();
@@ -785,7 +826,7 @@ void* ocpp_stateMachine(void * param)
                 }                     
                 break;
             case 4: //  Wait Unplug State
-                if( EVSE_CPstate == 1 )
+                if( ((EVSE_CPstate==2) || (EVSE_CPstate==3)))
                 {
                     ocppStateMachineState = 4;
                 }
